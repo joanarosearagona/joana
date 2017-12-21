@@ -1,0 +1,12 @@
+.recipeItem {
+  margin-bottom: 10px;
+}
+
+.panel-wrap {
+  overflow: hidden;
+  transition: all 0.2s ease-in;
+}
+
+.panel-heading {
+  cursor: pointer;
+}

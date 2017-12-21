@@ -1,0 +1,252 @@
+var Modal = ReactBootstrap.Modal;
+var Button = ReactBootstrap.Button;
+var ButtonToolbar = ReactBootstrap.ButtonToolbar;
+var Input = ReactBootstrap.Input;
+
+var saveData = function(recipes) {
+	if (typeof(Storage) !== "undefined") {
+		localStorage.setItem("recipes", 
+												 JSON.stringify(recipes).toString());
+	}
+};
+
+var loadData = function() {
+	if (typeof(Storage) !== "undefined") {
+		return JSON.parse(localStorage.getItem("recipes"));
+	}
+};
+
+var RecipeItem = React.createClass({
+	handleClick: function(e){
+		var el = this.refs.wrapper;
+		
+		if (this.state.open){
+			this.setState({
+				open: false,
+				class: "accordion-closed"
+			});
+			el.style.height = getComputedStyle(el).height;
+			el.offsetHeight;
+			el.style.height = 0;
+		}
+		else {
+			this.setState({
+				open: true,
+				class: "accordion-open"
+			});
+			var prev = el.style.height;
+			el.style.height = "auto";
+			var next = getComputedStyle(el).height;
+			el.style.height = prev;
+			el.offsetHeight;
+			el.style.height = next;
+			el.addEventListener("transitionend", function onTransitionEnd(){
+				el.style.height = "auto";
+				el.removeEventListener("transitionend", onTransitionEnd, false);
+			}, false);
+		}
+	},
+	
+	handleEdit: function(){
+		this.props.onEdit(this.props.index); 
+	},
+	
+	handleDelete: function(){ this.props.onDelete(this.props.index) },
+	
+	getInitialState: function(){
+		return {
+			open: false,
+			class: "accordion-closed"
+		};
+	},
+	
+	componentDidMount: function(){
+		var el = this.refs.wrapper;
+		el.style.height = 0;
+	},
+	
+	render: function(){
+		var classname = "panel panel-primary " + this.state.class;
+		var ingredients = this.props.ingredients.map(function(item){
+			return (
+				<li className="list-group-item" key={item}>{item}</li>
+			);
+		});
+		
+		return (
+			
+			<div className="recipeItem">
+				<div className={classname}>
+					<div className="panel-heading" onClick={this.handleClick}>
+						<h4 className="panel-title">
+							{this.props.title}
+						</h4>
+					</div>
+					<div className="panel-wrap" ref="wrapper">
+						<div className="panel-body">
+							<h4>Ingredients</h4>
+							<ul className="list-group">
+								{ingredients}
+							</ul>
+							<ButtonToolbar>
+								<button className="btn btn-danger" onClick={this.handleDelete}>Delete</button>
+								<button className="btn btn-default" onClick={this.handleEdit}>Edit</button>
+							</ButtonToolbar>
+						</div>
+					</div>
+				</div>
+			</div>
+			
+		);
+	}
+});
+
+var RecipeList = React.createClass({
+	
+	render: function(){
+		var self = this;
+		var recipes = this.props.recipes.map(function(recipe, idx){
+			return (
+				<RecipeItem key={idx} index={idx} title={recipe.title} ingredients={recipe.ingredients} onEdit={self.props.onEdit} onDelete={self.props.onDelete}/>
+				);
+		});
+		return (
+			<div className="recipeList">
+				<div className="panel-group" id="accordion">
+					{recipes}
+				</div>
+			</div>
+		);
+	}
+});
+
+var recipe = function(title, ingredients){
+	this.title = title;
+	this.ingredients = ingredients;
+};
+
+var RecipeModal = React.createClass({
+	
+	handleAdd: function(){
+		var title = this.refs.title.getValue();
+		var ingredients = this.refs.ingredients.getValue();
+		if (title && ingredients) {
+			var newrecipe = new recipe(title, ingredients.split(','));
+			this.props.addRecipe(newrecipe);
+		}
+	},
+	
+	handleEdit: function(){
+		var title = this.refs.title.getValue();
+		var ingredients = this.refs.ingredients.getValue();
+		if (title && ingredients) {
+			this.props.recipe.title = title;
+			this.props.recipe.ingredients = ingredients.split(',');
+			this.props.editRecipe();
+		}
+	},
+	
+	render: function(){
+		var saveButton = this.props.status === "add" ?
+			(<Button bsStyle="primary" onClick={this.handleAdd}>Add Recipe</Button>) :
+			(<Button bsStyle="primary" onClick={this.handleEdit}>Edit Recipe</Button>);
+		
+		var titleText = this.props.status === "add" ?
+				"" : this.props.recipe.title;
+		
+		var ingredientsText = this.props.status === "add" ?
+				"" : this.props.recipe.ingredients.toString();
+		
+		return (
+			<Modal show={this.props.show} onHide={this.props.onHide}>
+				<Modal.Header closeButton>
+					<Modal.Title>Recipe</Modal.Title>
+				</Modal.Header>
+				<Modal.Body>
+					<Input 
+						type="text"
+						label="Title"
+						placeholder="enter title"
+						ref="title"
+						defaultValue={titleText}
+						/>
+					<Input 
+						type="text"
+						label="Ingredients"
+						help="comma (,) separated items"
+						placeholder="enter ingredients"
+						ref="ingredients"
+						defaultValue={ingredientsText}
+						/>
+				</Modal.Body>
+				<Modal.Footer>
+					<ButtonToolbar>
+						{saveButton}
+						<Button onClick={this.props.onHide}>Close</Button>
+					</ButtonToolbar>
+				</Modal.Footer>
+			</Modal>
+		);
+	}
+});
+
+var RecipeContainer = React.createClass({
+	
+	getInitialState: function() {
+		var rec = loadData();
+		if (rec == null)
+			rec = [new recipe("Pie",["Crust","Fillings"])];
+		return { recipes: rec,
+						showModal: false,
+						editIdx: -1
+					 };
+	},
+	
+	close: function(){ this.setState({ showModal: false }); },
+	
+	open: function(){ this.setState({ showModal: true }); },
+	
+	addRecipe: function(newrecipe){
+		this.state.recipes.push(newrecipe);
+		this.setState({ recipes: this.state.recipes, showModal: false });
+		saveData(this.state.recipes);
+	},
+	
+	editRecipe: function() {
+		this.setState({ showModal: false, editIdx: -1 });
+		saveData(this.state.recipes);
+	},
+	
+	handleEdit : function(index){
+		this.setState({ editIdx: index, showModal: true });
+	},
+	
+	handleDelete : function(index){
+		this.state.recipes.splice(index, 1);
+		this.setState({ recipes: this.state.recipes });
+		saveData(this.state.recipes);
+	},
+	
+	render: function(){
+		var modal = this.state.editIdx === -1 ?
+				(<RecipeModal status="add" show={this.state.showModal} onHide={this.close} addRecipe={this.addRecipe} />) :
+				(<RecipeModal 
+					 status="edit" show={this.state.showModal} 
+					 onHide={this.close} editRecipe={this.editRecipe} 
+					 recipe={this.state.recipes[this.state.editIdx]}
+					 />);
+		
+		return (
+			<div className="container">
+				<h3>Recipe Box</h3>
+				<div className="well">
+					<RecipeList recipes={this.state.recipes} onEdit={this.handleEdit} onDelete={this.handleDelete}/>
+				</div>
+				<Button bsStyle="primary" onClick={this.open}>Add Recipe</Button>
+				{modal}
+			</div>
+		);
+	}
+});
+
+ReactDOM.render(<RecipeContainer />, document.getElementById('react-container'));
